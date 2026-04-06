@@ -21,6 +21,7 @@ interface Vignette {
   key_variable: string;
   clinical_vignette: string;
   guideline_source: string;
+  guideline_rationale: string;
 }
 
 interface Progress {
