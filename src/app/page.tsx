@@ -22,21 +22,13 @@ interface Vignette {
   clinical_vignette: string;
   guideline_source: string;
   guideline_rationale: string;
+  specialty_if_refer: string | null;
 }
 
 interface Progress {
   answered: number;
   total: number;
 }
-
-const SPECIALTIES = [
-  'Cardiology', 'Dermatology', 'Endocrinology', 'ENT',
-  'Gastroenterology', 'Gynaecology', 'Haematology', 'Hepatology',
-  'Nephrology', 'Neurology', 'Neurosurgery', 'Oncology',
-  'Ophthalmology', 'Orthopaedics', 'Paediatrics', 'Pain Management',
-  'Psychiatry', 'Respiratory', 'Rheumatology', 'Surgery',
-  'Urology', 'Other',
-];
 
 function Home() {
   const searchParams = useSearchParams();
@@ -49,7 +41,6 @@ function Home() {
   const [progress, setProgress] = useState<Progress>({ answered: 0, total: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
-  const [showSpecialty, setShowSpecialty] = useState(false);
   const [startTime, setStartTime] = useState<number>(Date.now());
 
   // Initialize reviewer
@@ -163,22 +154,16 @@ function Home() {
     }
   }
 
-  function handleRefer() {
-    setShowSpecialty(true);
-  }
-
-  function handleSpecialtySelect(specialty: string) {
-    setShowSpecialty(false);
+  function handleJustified() {
+    const specialty = vignette?.specialty_if_refer || 'a specialist';
     handleDecision('refer', specialty);
   }
 
-  function handleManage() {
-    setShowSpecialty(false);
+  function handleNotJustified() {
     handleDecision('manage');
   }
 
   function handleUnsure() {
-    setShowSpecialty(false);
     handleDecision('unsure');
   }
 
@@ -234,54 +219,40 @@ function Home() {
           <>
             <SurveyCard vignette={vignette} />
 
-            {/* Specialty picker overlay */}
-            {showSpecialty ? (
-              <div className="mt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Which specialty?</p>
-                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-                  {SPECIALTIES.map(s => (
-                    <button
-                      key={s}
-                      onClick={() => handleSpecialtySelect(s)}
-                      className="px-3 py-2 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors text-left"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+            {/* Referral justification question */}
+            <div className="mt-4 space-y-3">
+              {/* Referral statement */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                <p className="text-sm text-amber-800">
+                  This patient was referred to{' '}
+                  <span className="font-bold">{vignette.specialty_if_refer || 'a specialist'}</span>.
+                </p>
+                <p className="text-sm font-medium text-amber-900 mt-1">Is this referral justified?</p>
+              </div>
+
+              {/* Main buttons */}
+              <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={() => setShowSpecialty(false)}
-                  className="mt-2 w-full text-sm text-gray-500 underline"
+                  onClick={handleNotJustified}
+                  className="py-4 px-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
                 >
-                  Cancel
+                  Not Justified
+                </button>
+                <button
+                  onClick={handleJustified}
+                  className="py-4 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
+                >
+                  Justified
                 </button>
               </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {/* Main buttons */}
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={handleManage}
-                    className="py-4 px-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
-                  >
-                    Manage in<br />Primary Care
-                  </button>
-                  <button
-                    onClick={handleRefer}
-                    className="py-4 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
-                  >
-                    Refer to<br />Specialist
-                  </button>
-                </div>
-                {/* Unsure button */}
-                <button
-                  onClick={handleUnsure}
-                  className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  Not sure / Skip
-                </button>
-              </div>
-            )}
+              {/* Unsure button */}
+              <button
+                onClick={handleUnsure}
+                className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Not sure / Skip
+              </button>
+            </div>
           </>
         )}
       </main>
@@ -299,8 +270,8 @@ function WelcomeScreen({ onStart, defaultSlug }: { onStart: (name: string, speci
     <div className="flex flex-col items-center justify-center min-h-screen p-6 max-w-md mx-auto">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Referral Survey</h1>
       <p className="text-gray-600 text-center mb-6 text-sm leading-relaxed">
-        You will see clinical vignettes one at a time. For each patient, decide:
-        would you <strong>refer to a specialist</strong> or <strong>manage in primary care</strong>?
+        You will see clinical vignettes one at a time. Each patient has been referred to a specialist.
+        Your job: decide if the <strong>referral is justified</strong> or <strong>not justified</strong>.
       </p>
 
       <div className="w-full space-y-4">
