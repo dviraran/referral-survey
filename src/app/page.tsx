@@ -234,13 +234,13 @@ function Home() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={handleNotJustified}
-                  className="py-4 px-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
+                  className="py-4 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
                 >
                   Not Justified
                 </button>
                 <button
                   onClick={handleJustified}
-                  className="py-4 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
+                  className="py-4 px-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
                 >
                   Justified
                 </button>
