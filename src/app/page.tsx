@@ -243,7 +243,7 @@ function Home() {
                     <button
                       key={s}
                       onClick={() => handleSpecialtySelect(s)}
-                      className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors text-left"
+                      className="px-3 py-2 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors text-left"
                     >
                       {s}
                     </button>
