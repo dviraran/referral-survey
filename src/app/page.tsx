@@ -87,7 +87,11 @@ function Home() {
       p_count: 10,
     });
     if (data && data.length > 0) {
-      setQueue(prev => [...prev, ...data]);
+      setQueue(prev => {
+        const existingIds = new Set(prev.map(v => v.id));
+        const newItems = data.filter((v: Vignette) => !existingIds.has(v.id));
+        return [...prev, ...newItems];
+      });
       if (!vignette) {
         setVignette(data[0]);
         setQueue(data.slice(1));
@@ -142,7 +146,7 @@ function Home() {
     // Reset and move to next
     setPendingDecision(null);
     setComment('');
-    setProgress(prev => ({ ...prev, answered: prev.answered + 1 }));
+    await loadProgress(reviewerId);
 
     if (queue.length > 0) {
       setVignette(queue[0]);
