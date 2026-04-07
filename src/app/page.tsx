@@ -283,7 +283,7 @@ function Home() {
 
       {/* Main content */}
       <main className="flex-1 flex flex-col p-4">
-        {vignette && history.length > 0 && !pendingDecision && (
+        {vignette && history.length > 0 && (
           <button
             onClick={handlePrevious}
             className="self-start mb-2 text-sm text-blue-500 hover:text-blue-700 transition-colors flex items-center gap-1"
