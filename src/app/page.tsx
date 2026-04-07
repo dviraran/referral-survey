@@ -44,6 +44,7 @@ function Home() {
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [pendingDecision, setPendingDecision] = useState<{ decision: 'refer' | 'manage' | 'unsure'; specialty?: string } | null>(null);
   const [comment, setComment] = useState('');
+  const [history, setHistory] = useState<Vignette[]>([]);
 
   // Initialize reviewer
   useEffect(() => {
@@ -144,6 +145,7 @@ function Home() {
     }, { onConflict: 'reviewer_id,vignette_id' });
 
     // Reset and move to next
+    setHistory(prev => [...prev, vignette]);
     setPendingDecision(null);
     setComment('');
     await loadProgress(reviewerId);
@@ -179,9 +181,42 @@ function Home() {
     handleDecision(pendingDecision.decision, pendingDecision.specialty);
   }
 
-  function handleBack() {
+  function handleBackToButtons() {
     setPendingDecision(null);
     setComment('');
+  }
+
+  async function handlePrevious() {
+    if (history.length === 0 || !reviewerId) return;
+
+    // Push current vignette back to front of queue
+    if (vignette) {
+      setQueue(prev => [vignette, ...prev]);
+    }
+
+    // Pop from history
+    const prev = history[history.length - 1];
+    setHistory(h => h.slice(0, -1));
+    setVignette(prev);
+    setPendingDecision(null);
+    setComment('');
+    setStartTime(Date.now());
+
+    // Load previous response so they can see what they picked
+    const { data } = await supabase
+      .from('responses')
+      .select('decision, comment, specialty_if_refer')
+      .eq('reviewer_id', reviewerId)
+      .eq('vignette_id', prev.id)
+      .single();
+
+    if (data) {
+      setPendingDecision({
+        decision: data.decision as 'refer' | 'manage' | 'unsure',
+        specialty: data.specialty_if_refer || undefined,
+      });
+      setComment(data.comment || '');
+    }
   }
 
   // Welcome / registration screen
@@ -232,6 +267,14 @@ function Home() {
 
       {/* Main content */}
       <main className="flex-1 flex flex-col p-4">
+        {vignette && history.length > 0 && !pendingDecision && (
+          <button
+            onClick={handlePrevious}
+            className="self-start mb-2 text-sm text-blue-500 hover:text-blue-700 transition-colors flex items-center gap-1"
+          >
+            ← Previous question
+          </button>
+        )}
         {vignette && (
           <>
             <SurveyCard vignette={vignette} />
@@ -287,7 +330,7 @@ function Home() {
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <button
-                      onClick={handleBack}
+                      onClick={handleBackToButtons}
                       className="py-3 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl text-center transition-colors"
                     >
                       Back
