@@ -37,6 +37,7 @@ CREATE TABLE responses (
   decision TEXT NOT NULL CHECK (decision IN ('refer', 'manage', 'unsure')),
   specialty_if_refer TEXT,
   confidence INTEGER CHECK (confidence BETWEEN 1 AND 5),
+  comment TEXT,  -- optional free-text comment
   response_time_ms INTEGER,  -- how long they took to answer
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(reviewer_id, vignette_id)  -- one response per reviewer per vignette

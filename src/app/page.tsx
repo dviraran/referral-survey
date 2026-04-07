@@ -42,6 +42,8 @@ function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const [startTime, setStartTime] = useState<number>(Date.now());
+  const [pendingDecision, setPendingDecision] = useState<{ decision: 'refer' | 'manage' | 'unsure'; specialty?: string } | null>(null);
+  const [comment, setComment] = useState('');
 
   // Initialize reviewer
   useEffect(() => {
@@ -134,18 +136,19 @@ function Home() {
       decision,
       specialty_if_refer: specialty || null,
       response_time_ms: responseTimeMs,
+      comment: comment.trim() || null,
     }, { onConflict: 'reviewer_id,vignette_id' });
 
-    // Update progress
+    // Reset and move to next
+    setPendingDecision(null);
+    setComment('');
     setProgress(prev => ({ ...prev, answered: prev.answered + 1 }));
 
-    // Move to next
     if (queue.length > 0) {
       setVignette(queue[0]);
       setQueue(prev => prev.slice(1));
       setStartTime(Date.now());
 
-      // Refill queue if running low
       if (queue.length < 3 && reviewerId) {
         loadNextVignettes(reviewerId);
       }
@@ -156,15 +159,25 @@ function Home() {
 
   function handleJustified() {
     const specialty = vignette?.specialty_if_refer || 'a specialist';
-    handleDecision('refer', specialty);
+    setPendingDecision({ decision: 'refer', specialty });
   }
 
   function handleNotJustified() {
-    handleDecision('manage');
+    setPendingDecision({ decision: 'manage' });
   }
 
   function handleUnsure() {
-    handleDecision('unsure');
+    setPendingDecision({ decision: 'unsure' });
+  }
+
+  function handleConfirm() {
+    if (!pendingDecision) return;
+    handleDecision(pendingDecision.decision, pendingDecision.specialty);
+  }
+
+  function handleBack() {
+    setPendingDecision(null);
+    setComment('');
   }
 
   // Welcome / registration screen
@@ -230,28 +243,60 @@ function Home() {
                 <p className="text-sm font-medium text-amber-900 mt-1">Is this referral justified?</p>
               </div>
 
-              {/* Main buttons */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={handleNotJustified}
-                  className="py-4 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
-                >
-                  Not Justified
-                </button>
-                <button
-                  onClick={handleJustified}
-                  className="py-4 px-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
-                >
-                  Justified
-                </button>
-              </div>
-              {/* Unsure button */}
-              <button
-                onClick={handleUnsure}
-                className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                Not sure / Skip
-              </button>
+              {!pendingDecision ? (
+                <>
+                  {/* Main buttons */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={handleNotJustified}
+                      className="py-4 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
+                    >
+                      Not Justified
+                    </button>
+                    <button
+                      onClick={handleJustified}
+                      className="py-4 px-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl text-center transition-colors shadow-sm active:scale-95"
+                    >
+                      Justified
+                    </button>
+                  </div>
+                  {/* Unsure button */}
+                  <button
+                    onClick={handleUnsure}
+                    className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    Not sure / Skip
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* Comment step */}
+                  <div className="text-center text-sm text-gray-600">
+                    You selected: <span className="font-semibold">{pendingDecision.decision === 'refer' ? 'Justified' : pendingDecision.decision === 'manage' ? 'Not Justified' : 'Unsure'}</span>
+                  </div>
+                  <textarea
+                    value={comment}
+                    onChange={e => setComment(e.target.value)}
+                    placeholder="Any comments? (e.g. wrong specialty, missing info…)"
+                    className="w-full border border-gray-300 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    rows={2}
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={handleBack}
+                      className="py-3 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl text-center transition-colors"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleConfirm}
+                      className="py-3 px-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl text-center transition-colors"
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </>
         )}
