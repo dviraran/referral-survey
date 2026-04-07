@@ -258,6 +258,14 @@ function Home() {
           You reviewed {progress.answered} of {progress.total} vignettes.
         </p>
         <p className="text-gray-500 text-sm">Thank you for your contribution to this research.</p>
+        {history.length > 0 && (
+          <button
+            onClick={handlePrevious}
+            className="mt-6 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl transition-colors"
+          >
+            Review previous answers
+          </button>
+        )}
       </div>
     );
   }
