@@ -65,6 +65,7 @@ function Home() {
         setReviewerId(existing.id);
         setReviewerName(existing.name);
         await loadProgress(existing.id);
+        await loadAnsweredHistory(existing.id);
         await loadNextVignettes(existing.id);
       } else {
         setShowWelcome(true);
@@ -79,6 +80,21 @@ function Home() {
     const { data } = await supabase.rpc('get_reviewer_progress', { p_reviewer_id: rid });
     if (data && data.length > 0) {
       setProgress({ answered: Number(data[0].answered), total: Number(data[0].total) });
+    }
+  }
+
+  async function loadAnsweredHistory(rid: string) {
+    const { data } = await supabase
+      .from('responses')
+      .select('vignette_id, vignettes(*)')
+      .eq('reviewer_id', rid)
+      .order('created_at', { ascending: true });
+
+    if (data && data.length > 0) {
+      const vignettes = data
+        .map((r: any) => r.vignettes as Vignette)
+        .filter(Boolean);
+      setHistory(vignettes);
     }
   }
 
