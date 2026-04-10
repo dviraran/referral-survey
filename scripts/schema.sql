@@ -87,3 +87,42 @@ CREATE POLICY "Reviewers are insertable" ON reviewers FOR INSERT WITH CHECK (tru
 CREATE POLICY "Responses are insertable" ON responses FOR INSERT WITH CHECK (true);
 CREATE POLICY "Responses are readable" ON responses FOR SELECT USING (true);
 CREATE POLICY "Responses are updatable" ON responses FOR UPDATE USING (true);
+
+-- Review sets: named collections of vignettes for targeted re-review
+CREATE TABLE review_sets (
+  id SERIAL PRIMARY KEY,
+  set_name TEXT NOT NULL,
+  vignette_id INTEGER REFERENCES vignettes(id) NOT NULL,
+  UNIQUE(set_name, vignette_id)
+);
+
+CREATE INDEX idx_review_sets_name ON review_sets(set_name);
+
+ALTER TABLE review_sets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Review sets are readable" ON review_sets FOR SELECT USING (true);
+
+-- RPC to fetch review set vignettes + random camouflage
+CREATE OR REPLACE FUNCTION get_review_set_vignettes(
+  p_set_name TEXT,
+  p_reviewer_id UUID,
+  p_camouflage_count INTEGER DEFAULT 10
+)
+RETURNS SETOF vignettes AS $$
+  -- Target vignettes from the review set
+  (SELECT v.*
+   FROM vignettes v
+   INNER JOIN review_sets rs ON rs.vignette_id = v.id
+   WHERE rs.set_name = p_set_name)
+  UNION ALL
+  -- Random camouflage vignettes (not in the set, already answered by reviewer)
+  (SELECT v.*
+   FROM vignettes v
+   WHERE v.id NOT IN (
+     SELECT rs2.vignette_id FROM review_sets rs2 WHERE rs2.set_name = p_set_name
+   )
+   AND v.id IN (
+     SELECT r.vignette_id FROM responses r WHERE r.reviewer_id = p_reviewer_id
+   )
+   ORDER BY RANDOM()
+   LIMIT p_camouflage_count)
+$$ LANGUAGE sql STABLE;

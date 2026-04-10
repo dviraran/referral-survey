@@ -33,6 +33,7 @@ interface Progress {
 function Home() {
   const searchParams = useSearchParams();
   const reviewerSlug = searchParams.get('reviewer');
+  const setName = searchParams.get('set');
 
   const [reviewerId, setReviewerId] = useState<string | null>(null);
   const [reviewerName, setReviewerName] = useState('');
@@ -45,6 +46,7 @@ function Home() {
   const [pendingDecision, setPendingDecision] = useState<{ decision: 'refer' | 'manage' | 'unsure'; specialty?: string } | null>(null);
   const [comment, setComment] = useState('');
   const [history, setHistory] = useState<Vignette[]>([]);
+  const [isReviewSet, setIsReviewSet] = useState(false);
 
   // Initialize reviewer
   useEffect(() => {
@@ -64,9 +66,14 @@ function Home() {
       if (existing) {
         setReviewerId(existing.id);
         setReviewerName(existing.name);
-        await loadProgress(existing.id);
-        await loadAnsweredHistory(existing.id);
-        await loadNextVignettes(existing.id);
+        if (setName) {
+          setIsReviewSet(true);
+          await loadReviewSetVignettes(existing.id, setName);
+        } else {
+          await loadProgress(existing.id);
+          await loadAnsweredHistory(existing.id);
+          await loadNextVignettes(existing.id);
+        }
       } else {
         setShowWelcome(true);
       }
@@ -117,6 +124,28 @@ function Home() {
     }
   }
 
+  async function loadReviewSetVignettes(rid: string, sName: string) {
+    const { data } = await supabase.rpc('get_review_set_vignettes', {
+      p_set_name: sName,
+      p_reviewer_id: rid,
+      p_camouflage_count: 10,
+    });
+
+    if (data && data.length > 0) {
+      // Fisher-Yates shuffle
+      const shuffled = [...data];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+
+      setProgress({ answered: 0, total: shuffled.length });
+      setVignette(shuffled[0]);
+      setQueue(shuffled.slice(1));
+      setStartTime(Date.now());
+    }
+  }
+
   async function handleCreateReviewer(name: string, specialty: string, years: number) {
     const slug = reviewerSlug || name.toLowerCase().replace(/\s+/g, '-');
     const { data, error } = await supabase
@@ -164,14 +193,19 @@ function Home() {
     setHistory(prev => [...prev, vignette]);
     setPendingDecision(null);
     setComment('');
-    await loadProgress(reviewerId);
+
+    if (isReviewSet) {
+      setProgress(prev => ({ ...prev, answered: prev.answered + 1 }));
+    } else {
+      await loadProgress(reviewerId);
+    }
 
     if (queue.length > 0) {
       setVignette(queue[0]);
       setQueue(prev => prev.slice(1));
       setStartTime(Date.now());
 
-      if (queue.length < 3 && reviewerId) {
+      if (!isReviewSet && queue.length < 3 && reviewerId) {
         loadNextVignettes(reviewerId);
       }
     } else {
@@ -218,20 +252,25 @@ function Home() {
     setComment('');
     setStartTime(Date.now());
 
-    // Load previous response so they can see what they picked
-    const { data } = await supabase
-      .from('responses')
-      .select('decision, comment, specialty_if_refer')
-      .eq('reviewer_id', reviewerId)
-      .eq('vignette_id', prev.id)
-      .single();
+    if (isReviewSet) {
+      // Keep it fresh — don't show previous answer
+      setProgress(p => ({ ...p, answered: p.answered - 1 }));
+    } else {
+      // Load previous response so they can see what they picked
+      const { data } = await supabase
+        .from('responses')
+        .select('decision, comment, specialty_if_refer')
+        .eq('reviewer_id', reviewerId)
+        .eq('vignette_id', prev.id)
+        .single();
 
-    if (data) {
-      setPendingDecision({
-        decision: data.decision as 'refer' | 'manage' | 'unsure',
-        specialty: data.specialty_if_refer || undefined,
-      });
-      setComment(data.comment || '');
+      if (data) {
+        setPendingDecision({
+          decision: data.decision as 'refer' | 'manage' | 'unsure',
+          specialty: data.specialty_if_refer || undefined,
+        });
+        setComment(data.comment || '');
+      }
     }
   }
 
