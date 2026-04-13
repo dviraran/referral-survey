@@ -429,7 +429,6 @@ function WelcomeScreen({ onStart }: { onStart: (specialty: string, years: number
       <p className="text-gray-600 text-center mb-6 text-sm leading-relaxed">
         You will see clinical vignettes one at a time. Each patient has been referred to a specialist.
         Your job: decide if the <strong>referral is justified</strong> or <strong>not justified</strong>.
-        Answer as many as you like — even 10–20 is a valuable contribution.
       </p>
 
       <div className="w-full space-y-4">
