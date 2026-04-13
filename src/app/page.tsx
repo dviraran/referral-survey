@@ -36,7 +36,6 @@ function Home() {
   const setName = searchParams.get('set');
 
   const [reviewerId, setReviewerId] = useState<string | null>(null);
-  const [reviewerName, setReviewerName] = useState('');
   const [vignette, setVignette] = useState<Vignette | null>(null);
   const [queue, setQueue] = useState<Vignette[]>([]);
   const [progress, setProgress] = useState<Progress>({ answered: 0, total: 0 });
@@ -65,7 +64,6 @@ function Home() {
 
       if (existing) {
         setReviewerId(existing.id);
-        setReviewerName(existing.name);
         if (setName) {
           setIsReviewSet(true);
           await loadReviewSetVignettes(existing.id, setName);
@@ -146,11 +144,27 @@ function Home() {
     }
   }
 
-  async function handleCreateReviewer(name: string, specialty: string, years: number) {
-    const slug = reviewerSlug || name.toLowerCase().replace(/\s+/g, '-');
+  async function handleCreateReviewer(specialty: string, years: number) {
+    // Generate anonymous slug
+    const randomSuffix = Math.random().toString(36).slice(2, 10);
+    const slug = reviewerSlug || `anon-${randomSuffix}`;
+    const name = `Anonymous ${randomSuffix}`;
+
+    // Try to detect country from IP (non-blocking, best-effort)
+    let country: string | null = null;
+    try {
+      const res = await fetch('https://ipapi.co/json/');
+      if (res.ok) {
+        const info = await res.json();
+        country = info.country_name || info.country || null;
+      }
+    } catch {
+      // ignore
+    }
+
     const { data, error } = await supabase
       .from('reviewers')
-      .insert({ name, slug, specialty, years_experience: years })
+      .insert({ name, slug, specialty, years_experience: years, country })
       .select()
       .single();
 
@@ -160,11 +174,9 @@ function Home() {
     }
 
     setReviewerId(data.id);
-    setReviewerName(data.name);
     setShowWelcome(false);
     setIsLoading(true);
 
-    // Update URL with reviewer slug
     if (!reviewerSlug) {
       window.history.replaceState(null, '', `?reviewer=${slug}`);
     }
@@ -276,7 +288,7 @@ function Home() {
 
   // Welcome / registration screen
   if (showWelcome) {
-    return <WelcomeScreen onStart={handleCreateReviewer} defaultSlug={reviewerSlug} />;
+    return <WelcomeScreen onStart={handleCreateReviewer} />;
   }
 
   if (isLoading) {
@@ -313,18 +325,8 @@ function Home() {
     <div className="flex flex-col min-h-screen max-w-lg mx-auto">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-white border-b px-4 py-3">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-gray-500">Hi, {reviewerName}</span>
-          <span className="text-sm font-medium text-gray-700">
-            {progress.answered} / {progress.total}
-          </span>
-        </div>
-        {/* Progress bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div
-            className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-            style={{ width: `${progress.total > 0 ? (progress.answered / progress.total) * 100 : 0}%` }}
-          />
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Referral Survey</span>
         </div>
       </header>
 
@@ -416,10 +418,10 @@ function Home() {
 }
 
 // Welcome / registration component
-function WelcomeScreen({ onStart, defaultSlug }: { onStart: (name: string, specialty: string, years: number) => void; defaultSlug: string | null }) {
-  const [name, setName] = useState('');
+function WelcomeScreen({ onStart }: { onStart: (specialty: string, years: number) => void }) {
   const [specialty, setSpecialty] = useState('');
   const [years, setYears] = useState('');
+  const [consent, setConsent] = useState(false);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-6 max-w-md mx-auto">
@@ -427,32 +429,20 @@ function WelcomeScreen({ onStart, defaultSlug }: { onStart: (name: string, speci
       <p className="text-gray-600 text-center mb-6 text-sm leading-relaxed">
         You will see clinical vignettes one at a time. Each patient has been referred to a specialist.
         Your job: decide if the <strong>referral is justified</strong> or <strong>not justified</strong>.
+        Answer as many as you like — even 10–20 is a valuable contribution.
       </p>
 
       <div className="w-full space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Your name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Dr. Smith"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Your specialty</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Your role</label>
           <select
             value={specialty}
             onChange={e => setSpecialty(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Select...</option>
-            <option value="General Practice / Family Medicine">General Practice / Family Medicine</option>
-            <option value="Internal Medicine">Internal Medicine</option>
-            <option value="Emergency Medicine">Emergency Medicine</option>
-            <option value="Paediatrics">Paediatrics</option>
-            <option value="Other">Other</option>
+            <option value="General Practice">General Practice</option>
+            <option value="Specialty">Specialty</option>
           </select>
         </div>
         <div>
@@ -467,10 +457,33 @@ function WelcomeScreen({ onStart, defaultSlug }: { onStart: (name: string, speci
             max="50"
           />
         </div>
+
+        {/* Consent */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 leading-relaxed">
+          <p className="font-semibold text-gray-800 mb-1">Consent to participate</p>
+          <p>
+            This is an anonymous research study on clinical referral decision-making. No personal
+            identifying information is collected. Your responses, your country (inferred from your
+            IP address), your specialty, and years of experience will be stored for research
+            analysis and may be published in aggregate form. Participation is voluntary and you can
+            stop at any time.
+          </p>
+          <label className="flex items-start gap-2 mt-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={e => setConsent(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-gray-800">I agree to participate under these terms.</span>
+          </label>
+        </div>
+
         <button
           onClick={() => {
-            if (!name.trim()) { alert('Please enter your name'); return; }
-            onStart(name.trim(), specialty, parseInt(years) || 0);
+            if (!specialty) { alert('Please select your role'); return; }
+            if (!consent) { alert('Please agree to the consent to continue'); return; }
+            onStart(specialty, parseInt(years) || 0);
           }}
           className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl transition-colors shadow-sm"
         >
@@ -479,7 +492,7 @@ function WelcomeScreen({ onStart, defaultSlug }: { onStart: (name: string, speci
       </div>
 
       <p className="text-xs text-gray-400 mt-6 text-center">
-        ~244 vignettes. Takes about 30 minutes. You can stop and resume anytime.
+        Answer as many vignettes as you like. You can stop anytime.
       </p>
     </div>
   );
